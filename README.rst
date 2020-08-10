@@ -14,7 +14,7 @@ Monitoring over Icinga2
 ITTN-027
 ========
 
-Puppet deployment of monitoring system based on a master-client design, in which all puppet clients will automatically enroll to the icinga master, also being reflect in the Web Interface through IcingaWeb2, handled by Icinga Director and deploying graphs through PNP
+Puppet deployment consisting on monitoring system based on a master-client design, in which all puppet clients will automatically enroll to the icinga master, also being reflect in the Web Interface through IcingaWeb2, handled by Icinga Director and deploying graphs through PNP
 
 **Links:**
 
