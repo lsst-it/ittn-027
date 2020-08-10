@@ -1,78 +1,44 @@
-.. image:: https://img.shields.io/badge/ittn--027-lsst.io-brightgreen.svg
-   :target: https://ittn-027.lsst.io
-.. image:: https://github.com/lsst-it/ittn-027/workflows/CI/badge.svg
-   :target: https://github.com/lsst-it/ittn-027/actions/
-..
-  Uncomment this section and modify the DOI strings to include a Zenodo DOI badge in the README
-  .. image:: https://zenodo.org/badge/doi/10.5281/zenodo.#####.svg
-     :target: http://dx.doi.org/10.5281/zenodo.#####
 
 #######################
 Monitoring over Icinga2
 #######################
 
-ITTN-027
-========
+Introduction
+============
 
-Puppet deployment consisting on monitoring system based on a master-client design, in which all puppet clients will automatically enroll to the icinga master, also being reflect in the Web Interface through IcingaWeb2, handled by Icinga Director and deploying graphs through PNP
+Puppet deployment consisting on monitoring system based on a master-client design, 
+in which all puppet clients will automatically enroll to the icinga master, also 
+being reflect in the Web Interface through IcingaWeb2, handled by Icinga Director 
+and deploying graphs through PNP.
 
-**Links:**
+The taken approach allow us to have multiple master instances, and that every node
+response to their own master. For future developments, the idea is to join the 
+masters into a replicate configuration to visualize all instances.
 
-- Publication URL: https://ittn-027.lsst.io
-- Alternative editions: https://ittn-027.lsst.io/v
-- GitHub repository: https://github.com/lsst-it/ittn-027
-- Build system: https://github.com/lsst-it/ittn-027/actions/
+Requirements
+============
+
+In order to deploy Icinga2 and IcingaWeb2, there are several dependancies that have
+to be taken care off. The built code includes those references and is in a "ready to
+deploy" status
+
+- Remi                     https://github.com/hfm/puppet-remi                      v1.11.0
+- Icinga2                  https://github.com/Icinga/puppet-icinga2                v2.3.2
+- IcingaWeb2               https://github.com/Icinga/puppet-icingaweb2             v2.3.1
+- Nginx                    https://github.com/voxpupuli/puppet-nginx               v1.1.0
+- MySql Server             https://github.com/puppetlabs/puppetlabs-mysql          v10.4.0
+- IcingaWeb Director       (part of icinga repo)                                   v1.7.2
+- IcingaWeb PNP            https://github.com/Icinga/icingaweb2-module-pnp.git     v1.1.0
+- IcingaWeb Reactbundle    https://github.com/Icinga/icingaweb2-module-reactbundle v0.7.0
+- IcingaWeb IPL            https://github.com/Icinga/icingaweb2-module-ipl         v0.3.0
+- IcingaWeb Incubator      https://github.com/Icinga/icingaweb2-module-incubator   v0.5.0
 
 
-Build this technical note
-=========================
+Code References
+===============
 
-You can clone this repository and build the technote locally with `Sphinx`_:
-
-.. code-block:: bash
-
-   git clone https://github.com/lsst-it/ittn-027
-   cd ittn-027
-   pip install -r requirements.txt
-   make html
-
-.. note::
-
-   In a Conda_ environment, ``pip install -r requirements.txt`` doesn't work as expected.
-   Instead, ``pip`` install the packages listed in ``requirements.txt`` individually.
-
-The built technote is located at ``_build/html/index.html``.
-
-Editing this technical note
-===========================
-
-You can edit the ``index.rst`` file, which is a reStructuredText document.
-The `DM reStructuredText Style Guide`_ is a good resource for how we write reStructuredText.
-
-Remember that images and other types of assets should be stored in the ``_static/`` directory of this repository.
-See ``_static/README.rst`` for more information.
-
-The published technote at https://ittn-027.lsst.io will be automatically rebuilt whenever you push your changes to the ``master`` branch on `GitHub <https://github.com/lsst-it/ittn-027>`_.
-
-Updating metadata
-=================
-
-This technote's metadata is maintained in ``metadata.yaml``.
-In this metadata you can edit the technote's title, authors, publication date, etc..
-``metadata.yaml`` is self-documenting with inline comments.
-
-Using the bibliographies
-========================
-
-The bibliography files in ``lsstbib/`` are copies from `lsst-texmf`_.
-You can update them to the current `lsst-texmf`_ versions with::
-
-   make refresh-bib
-
-Add new bibliography items to the ``local.bib`` file in the root directory (and later add them to `lsst-texmf`_).
-
-.. _Sphinx: http://sphinx-doc.org
-.. _DM reStructuredText Style Guide: https://developer.lsst.io/restructuredtext/style.html
-.. _this repo: ./index.rst
-.. _Conda: http://conda.pydata.org/docs/
-.. _lsst-texmf: https://lsst-texmf.lsst.io
+The configured code can be found in both the public and private repo:
+ - Icinga Master
+   https://github.com/lsst-it/lsst-itconf/blob/master/site/profile/manifests/core/icinga_master.pp
+ - Icinga Agent
+   https://github.com/lsst-it/lsst-itconf/blob/master/site/profile/manifests/core/icinga_agent.pp
