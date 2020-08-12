@@ -162,9 +162,107 @@ Finally to add the Host:
    }
 
 
-:tocdepth: 1
+Icinga2 Master modules and configuration
+========================================
 
-.. Please do not modify tocdepth; will be fixed when a new Sphinx theme is shipped.
+This comprise only the require information for the master's configuration. There are two ways of setting up a feature:
+One, but adding it into the feature list (with the features default values), and the second declaring the class and 
+specifying the values.
+
+.. code-block:: puppet
+
+   class { '::icinga2':
+      manage_repo => true,
+      confd       => false,
+      constants   => {
+         'ZoneName'   => 'master',
+      },
+      features    => ['checker','mainlog','statusdata','compatlog','command'],
+   }
+
+The IdoMySQL features
+---------------------
+
+Uses a prexistent (allready created) MySQL database. In the class, you must add the name, pasword 
+and database name you gave to the prexistent database.
+
+.. code-block:: puppet
+
+   class { '::icinga2::feature::idomysql':
+      user          => $mysql_icingaweb_user,
+      password      => $mysql_icingaweb_pwd,
+      database      => $mysql_icingaweb_db,
+      host          => $master_ip,
+      import_schema => true,
+      require       => Mysql::Db[$mysql_icingaweb_db],
+   }
+
+API feature
+-----------
+
+Is the method in which objects are read and published in between Icinga2 and IcingaWeb2. By setting the pki 
+to none, you will need to provide a certificate and a CA that validates it; if set to icinga, it sets the icinga master as
+a CA and all agents will request a certificate to it. Then, there's the option that has been used here, which is use puppet
+master as a CA and use the already generated certificates by the puppet server.
+
+.. code-block:: puppet
+
+   class { '::icinga2::feature::api':
+      pki             => 'puppet',
+      accept_config   => true,
+      accept_commands => true,
+      ensure          => 'present',
+      endpoints       => {
+         $master_fqdn    => {
+         'host'  =>  $master_ip
+         },
+      },
+      zones           => {
+         'master'    => {
+         'endpoints' => [$master_fqdn],
+         },
+      },
+   }
+
+Notification feature
+--------------------
+
+Enables notifications.
+
+.. code-block:: puppet
+
+   class { '::icinga2::feature::notification':
+      ensure    => present,
+      enable_ha => true,
+   }
+
+Perfdata feature
+----------------
+
+Enables the proccesing of the data in order to generate graphs and data management.
+
+.. code-block:: puppet
+
+  class {'::icinga2::feature::perfdata':
+    ensure => present,
+  }
+
+Api User
+--------
+
+The API user is am object (that in difference of the templates, it is being generated through puppet code), creates the 
+user and password in which the Icinga2 and IcingaWeb2 instances communicate to each other. Bear in mind that the same
+user adn password must be later used for the IcingaWeb2 configuration.
+
+.. code-block:: puppet
+
+   icinga2::object::apiuser { $api_user:
+      ensure      => present,
+      password    => $api_pwd,
+      permissions => [ '*' ],
+      target      => '/etc/icinga2/features-enabled/api-users.conf',
+   }
+
 
 .. sectnum::
 
