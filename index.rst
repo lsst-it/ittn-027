@@ -1,8 +1,4 @@
 
-
-Monitoring over Icinga2
-#######################
-
 Introduction
 ============
 
@@ -59,35 +55,112 @@ The configured code can be found in both the public and private repo:
 Services, Hosts and Templates
 =============================
 
+There are 4 things (or objects) to take in consideration: Host templates, Service templates, Hosts and Services.
+Host Templates are responsable of providing the final host object an inheritad default configuration, as
+well as a default configuration.
+Service templates are the ones that have the "check_command" on them, which means, is the one that defines
+which operation is going to be perform in the remote host (without defining yet the host).
+Services per se, links or vinculates a Host Template with a Service Template, so all hosts that use the
+defined Host Template, will automatically inherit the previously linked Service Template.
+Finally, when you define a Host, you simply use the defined Host Template, and the host will add itself
+with the Service Template (check_command, monitoring operation that will be perform) into the icinga
+master.
 
-  Use the following syntax for sections:
+Host Templates
+--------------
 
-  Sections
-  ========
+To create a Host Template, you must specify the following fields:
+   - accept_config:         Allow the host to receive instructions from the icinga master.
+   - check_command:         Default command to run to the hosts; preferably leave it in "hostalive".
+   - has_agent:             Agent must have installed and be configured with icinga agent.
+   - master_should_connect: Set to "yes".
+   - max_check_attempts:    Number of attempts the master will try to check the host.
+   - object_name:           The name to which you will later reffer to this object.
+   - object_type:           Set to "template".
 
-  and
+.. code-block:: json
 
-  Subsections
-  -----------
+   {
+    "accept_config": true,
+    "check_command": "hostalive",
+    "has_agent": true,
+    "master_should_connect": true,
+    "max_check_attempts": "5",
+    "object_name": "${host_template_name}",
+    "object_type": "template"
+   }
 
-  and
+Service Templates
+-----------------
 
-  Subsubsections
-  ^^^^^^^^^^^^^^
+To create a Service Template, you must specify the following field:
+   - check_command: The monitoring command you which to report, such us dhcp, dns, ldap.
+   - object_name:   The name to which you will later reffer to this object.
+   - object_type:   Set to "template".
+   - use_agent:     Allow connection to the icinga agent installation in the host.
+   - vars:          Define additional variables, such as warning land critical level, ldap parameters, ping response time.
+   - zone:          Zone in which the icinga master is configured.
 
-  To add images, add the image file (png, svg or jpeg preferred) to the
-  _static/ directory. The reST syntax for adding the image is
+.. code-block:: json
 
-  .. figure:: /_static/filename.ext
-     :name: fig-label
+   {
+    "check_command": "ldap",
+    "object_name": "${service_template_name}",
+    "object_type": "template",
+    "use_agent": true,
+    "vars": {
+      "ldap_address": "localhost",
+      "ldap_base": "dc=lsst,dc=cloud"
+    },
+    "zone": "master"
+   }
 
-     Caption text.
+Services
+--------
 
-   Run: ``make html`` and ``open _build/html/index.html`` to preview your work.
-   See the README at https://github.com/lsst-sqre/lsst-technote-bootstrap or
-   this repo's README for more info.
+In order to create a Service, you must use the exact same object names that were used in the Host Template and the Service Template:
+   - host:        For a Service object, you must provide the host_template_name (same as the one used before).
+   - imports:     For a Service object, you must provide the service_template_name (same as the one used before).
+   - object_name: The name to which you will later reffer to this object.
+   - object_type: Set to "object".
 
-   Feel free to delete this instructional comment.
+.. code-block:: json
+
+   {
+    "host": "${host_template}",
+    "imports": [
+    "${$service_template}"
+    ],
+    "object_name": "${service_name}",
+    "object_type": "object"
+   }
+
+Hosts
+-----
+
+Finally to add the Host:
+   - address:      The IP address of the host.
+   - display_name: For consistency, use the Fully Qualified Domain Name.
+   - imports:      For a Host object, you must provide the host_template_name that you wish this host is part of.
+   - object_name": For consistency, use the Fully Qualified Domain Name. This name will be use for future reference.
+   - object_type": Set to object.
+   - vars:         Define additional variables that are specific to this host.
+
+.. code-block:: json
+
+   {
+    "address": "${host_ip}",
+    "display_name": "$host_fqdn",
+    "imports": [
+      "${host_template}"
+    ],
+    "object_name":"${host_fqdn}",
+    "object_type": "object",
+    "vars": {
+      "safed_profile": "3"
+    }
+   }
+
 
 :tocdepth: 1
 
@@ -97,18 +170,3 @@ Services, Hosts and Templates
 
 .. TODO: Delete the note below before merging new content to the master branch.
 
-.. note::
-
-   **This technote is not yet published.**
-
-   Puppet deployment of monitoring system based on a master-client design, in which all puppet clients will automatically enroll to the icinga master, also being reflect in the Web Interface through IcingaWeb2, handled by Icinga Director and deploying graphs through PNP
-
-.. Add content here.
-.. Do not include the document title (it's automatically added from metadata.yaml).
-
-.. .. rubric:: References
-
-.. Make in-text citations with: :cite:`bibkey`.
-
-.. .. bibliography:: local.bib lsstbib/books.bib lsstbib/lsst.bib lsstbib/lsst-dm.bib lsstbib/refs.bib lsstbib/refs_ads.bib
-..    :style: lsst_aa
