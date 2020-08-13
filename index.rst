@@ -239,7 +239,7 @@ Enables notifications.
 Perfdata feature
 ----------------
 
-Enables the proccesing of the data in order to generate graphs and data management.
+Enables the processing of the data in order to generate graphs and data management.
 
 .. code-block:: puppet
 
@@ -263,6 +263,322 @@ user adn password must be later used for the IcingaWeb2 configuration.
       target      => '/etc/icinga2/features-enabled/api-users.conf',
    }
 
+Icinga2 Agent modules and configuration
+========================================
+
+The configuration only requires to establish that the repository is going to be handled by the icinga2 module, that the 
+conf.d folder is not going to be considered and the only require feature (with defaul values) is mainlog.
+
+.. code-block:: puppet
+
+   class { '::icinga2':
+      manage_repo => true,
+      confd       => false,
+      features    => ['mainlog'],
+   }
+
+
+API feature
+-----------
+
+The icinga agents must be aware of who the icinga master is, so it's important to declare it at the endpoint and zones. 
+The pki, as well as in the master, is set to puppet, but also we have to set the agent to acept configurations and 
+commands from the master; that is were the aceept_config and accept_commands come in place. 
+
+
+.. code-block:: puppet
+
+   class { '::icinga2::feature::api':
+      pki             => 'puppet',
+      accept_config   => true,
+      accept_commands => true,
+      ensure          => 'present',
+      endpoints       => {
+         $icinga_agent_fqdn  => {
+         'host'  =>  $icinga_agent_ip
+         },
+         $icinga_master_fqdn => {
+         'host'  =>  $icinga_master_ip,
+         },
+      },
+      zones           => {
+         $icinga_agent_fqdn => {
+         'endpoints' => [$icinga_agent_fqdn],
+         'parent'    => 'master',
+         },
+         'master'           => {
+         'endpoints' => [$icinga_master_fqdn],
+         },
+      }
+   }
+
+IcingaWeb2 modules and configuration
+========================================
+
+This installation is only carried in the icinga master. As the configuration per se is quite reduced: The repo is being 
+handled by the icinga2 module, hence the need of requiring that the icinga2 class gets deployed first. Also, setting
+the log level to Info provides a better troubleshooting.
+
+.. code-block:: puppet
+
+   class {'::icingaweb2':
+      manage_repo   => false,
+      logging_level => 'INFO',
+      require       => Class['::icinga2'],
+   }
+
+Monitoring Module
+-----------------
+
+This module is the one responsable of communicating with the icinga2 service over the API user/password, then this two MUST
+be the same one as provided during the icinga agent module configuration.
+The ido parameters are the ones that connects with the MySQL database; this ones, as well as with the API credentials, must
+be the same as the one provided in the icinga module configuration.
+
+.. code-block:: puppet
+
+   class {'icingaweb2::module::monitoring':
+      ensure            => present,
+      ido_host          => $master_ip,
+      ido_type          => 'mysql',
+      ido_db_name       => $mysql_icingaweb_db,
+      ido_db_username   => $mysql_icingaweb_user,
+      ido_db_password   => $mysql_icingaweb_pwd,
+      commandtransports => {
+         $api_name => {
+         transport => 'api',
+         host      => $master_ip,
+         port      => 5665,
+         username  => $api_user,
+         password  => $api_pwd,
+         }
+      }
+   }
+
+LDAP Configuration
+------------------
+
+There are four modules responsable of deploying, without further configuration, the LDAP service in the IcingaWeb platform.
+
+Resources
+^^^^^^^^^
+
+The resource name will be associated with the set ldap_resource value. Is important, that later on, you will need that 
+value to reference this particular resource.
+
+.. code-block:: puppet
+  
+   icingaweb2::config::resource{ $ldap_resource:
+      type         => 'ldap',
+      host         => $ldap_server,
+      port         => 389,
+      ldap_root_dn => $ldap_root,
+      ldap_bind_dn => $ldap_user,
+      ldap_bind_pw => $ldap_pwd,
+   }
+
+Authmethod
+^^^^^^^^^^
+
+There are two ways to authenticate to the IcingaWeb WUI: ldap or mysql. Since we already declared the resource, the previously 
+declared resource name must be used at the 'resource' value. Also worth mentioning that the backend value has to be set to ldap.
+
+.. code-block:: puppet
+
+   icingaweb2::config::authmethod { 'ldap-auth':
+      backend                  => 'ldap',
+      resource                 => $ldap_resource,
+      ldap_user_class          => 'inetOrgPerson',
+      ldap_filter              => $ldap_user_filter,
+      ldap_user_name_attribute => 'uid',
+      order                    => '05',
+   }
+
+Groupbackend
+^^^^^^^^^^^^
+
+Using the ldap resource, now the IcingaWeb reads and filters the groups from the remote LDAP server.
+
+.. code-block:: puppet
+
+   icingaweb2::config::groupbackend { 'ldap-groups':
+      backend                   => 'ldap',
+      resource                  => $ldap_resource,
+      ldap_group_class          => 'groupOfNames',
+      ldap_group_name_attribute => 'cn',
+      ldap_group_filter         => $ldap_group_filter,
+      ldap_base_dn              => $ldap_group_base,
+   }
+
+Roles
+^^^^^
+
+Finally there is the roles. A role defines one of the read groups and grants them priviledges, which can go from read only,
+modify readdings, delete agents, force a 'check now' on a host/service, or even change configurations.
+
+.. code-block:: puppet
+
+   icingaweb2::config::role { 'Admin User':
+      groups      => 'icinga-admins',
+      permissions => '*',
+   }
+
+IcingaWeb Director
+------------------
+
+The Director uses it's own MySQL database and acts as an intermediary between Icinga2 and IcingaWeb2. This is the final piece
+that puts toghether all the recopilated data into one place and displays it through the WUI. The API user and password MUST be
+the same ones as provided during the Icinga2 and IcingaWeb2 IDO configuration
+
+.. code-block:: puppet
+
+   class {'icingaweb2::module::director':
+      git_revision  => 'v1.7.2',
+      db_host       => $master_ip,
+      db_name       => $mysql_director_db,
+      db_username   => $mysql_director_user,
+      db_password   => $mysql_director_pwd,
+      import_schema => true,
+      kickstart     => true,
+      endpoint      => $master_fqdn,
+      api_host      => $master_ip,
+      api_port      => 5665,
+      api_username  => $api_user,
+      api_password  => $api_pwd,
+      require       => Mysql::Db[$mysql_director_db],
+   }
+
+The Director module requires three additional modules to properly work: Reactbundle, IPL and Incubator.
+
+.. code-block:: puppet
+
+   class {'icingaweb2::module::reactbundle':
+      ensure         => present,
+      git_repository => 'https://github.com/Icinga/icingaweb2-module-reactbundle',
+      git_revision   => 'v0.7.0',
+      require        => Class['::icingaweb2'],
+   }
+   class {'icingaweb2::module::ipl':
+      ensure         => present,
+      git_repository => 'https://github.com/Icinga/icingaweb2-module-ipl',
+      git_revision   => 'v0.3.0',
+      require        => Class['::icingaweb2'],
+   }
+   class {'icingaweb2::module::incubator':
+      ensure         => present,
+      git_repository => 'https://github.com/Icinga/icingaweb2-module-incubator',
+      git_revision   => 'v0.5.0',
+      require        => Class['::icingaweb2'],
+   }
+
+IcingaWeb PNP
+-------------
+
+Is a graphing add on to IcingaWeb, that along with npcd and npcdmod collects performance data files, that are later
+processed by Icinga2 Perfdata. Then, the PNP module uses the processed data and displayed them into graphs.
+
+
+.. code-block:: puppet
+
+   vcsrepo { '/usr/share/icingaweb2/modules/pnp':
+      ensure   => present,
+      provider => git,
+      source   => 'git://github.com/Icinga/icingaweb2-module-pnp.git',
+      revision => 'v1.1.0',
+      require  => Class['::icingaweb2'],
+   }
+   exec { 'icingacli module enable pnp':
+      cwd     => '/var/tmp/',
+      path    => ['/sbin', '/usr/sbin', '/bin'],
+      onlyif  => ['test ! -d /etc/icingaweb2/enabledModules/pnp'],
+      require => Class['icingaweb2::module::director'],
+   }
+
+Nginx
+-----
+
+Latest but not less important, is the Nginx module configuration. Nginx is a web server, that can also be used as a reverse proxy or 
+loadbalancer. 
+
+Nginx Server
+^^^^^^^^^^^^
+
+The core of the web service, is to declare the server. You must choose a name (to which later will be used to reference it). 
+
+The components are explain as:
+   - server_name:    This value is the one the server will respond to, so it's suggested to use the FQDN.
+   - ssl:            Set to 'true' to enable ssl. If true, cert and key must be provided.
+   - ssl_cert:       Absolute path to the SSL Certificate.
+   - ssl_key:        Absolute path to the SSL Key.
+   - ssl_redirect:   If 'true', all http requests will be redirect to https.
+   - index_files:    Default index file that will be presented to the end user.
+   - www_root:       Absolute path to the root folder of the service (most commonly /var/www/html).
+   - include_files:  Absolute path to any other particular configuration file that must the considered.
+
+In this case, letsencrypt was used to provied signed certificate, which will write the cert and key to the specify path that the 
+module has set.
+
+.. code-block:: puppet
+
+   letsencrypt::certonly { $master_fqdn:
+         plugin      => 'dns-route53',
+         manage_cron => true,
+   }
+
+   nginx::resource::server { 'icingaweb2':
+      server_name          => [$master_fqdn],
+      ssl                  => true,
+      ssl_cert             => "${le_root}/cert.pem",
+      ssl_key              => "${le_root}/privkey.pem",
+      ssl_redirect         => true,
+      index_files          => ['index.php'],
+      use_default_location => false,
+      www_root             => '/usr/share/icingaweb2/public',
+      include_files        => ['/etc/nginx/sites-available/pnp4nagios.conf'],
+   }
+
+Nginx Locations
+^^^^^^^^^^^^^^^
+
+IcingaWeb uses fastcgi, which is a protocol that allows interface for web server to interact with programs. In order for the locations
+to work, the server name specified above must match the one of the locations. Is also important to set in every one of the the ssl and
+ssl_only flags to 'true'.
+
+.. code-block:: puppet
+
+   
+   nginx::resource::location { 'root':
+      location    => '/',
+      server      => 'icingaweb2',
+      try_files   => ['$1', '$uri', '$uri/', '/index.php$is_args$args'],
+      index_files => [],
+      ssl         => true,
+      ssl_only    => true,
+   }
+   nginx::resource::location { 'icingaweb':
+      location       => '~ ^/icingaweb2(.+)?',
+      location_alias => '/usr/share/icingaweb2/public',
+      try_files      => ['$1', '$uri', '$uri/', '/icingaweb2/index.php$is_args$args'],
+      index_files    => ['index.php'],
+      server         => 'icingaweb2',
+      ssl            => true,
+      ssl_only       => true,
+   }
+   nginx::resource::location { 'icingaweb2_index':
+      location      => '~ ^/index\.php(.*)$',
+      server        => 'icingaweb2',
+      ssl           => true,
+      ssl_only      => true,
+      index_files   => [],
+      try_files     => ['$uri =404'],
+      fastcgi       => '127.0.0.1:9000',
+      fastcgi_index => 'index.php',
+      fastcgi_param => {
+         'ICINGAWEB_CONFIGDIR' => '/etc/icingaweb2',
+         'REMOTE_USER'         => '$remote_user',
+         'SCRIPT_FILENAME'     => '/usr/share/icingaweb2/public/index.php',
+      },
+   }
 
 .. sectnum::
 
