@@ -167,7 +167,7 @@ Icinga2 Master modules and configuration
 
 This comprise only the require information for the master's configuration. There are two ways of setting up a feature:
 One, but adding it into the feature list (with the features default values), and the second declaring the class and 
-specifying the values.
+specifying the values. The constant TicketSalt is required when using icinga master as a CA (which is the case).
 
 .. code-block:: puppet
 
@@ -176,6 +176,7 @@ specifying the values.
       confd       => false,
       constants   => {
          'ZoneName'   => 'master',
+         'TicketSalt' => $ca_salt,
       },
       features    => ['checker','mainlog','statusdata','compatlog','command'],
    }
@@ -201,14 +202,16 @@ API feature
 -----------
 
 Is the method in which objects are read and published in between Icinga2 and IcingaWeb2. By setting the pki 
-to none, you will need to provide a certificate and a CA that validates it; if set to icinga, it sets the icinga master as
-a CA and all agents will request a certificate to it. Then, there's the option that has been used here, which is use puppet
-master as a CA and use the already generated certificates by the puppet server.
+to none, you will need to provide a certificate and a CA that validates it; if set to icinga (default), it 
+sets the icinga master as a CA and all agents will request a certificate to it. There is also the option to 
+use 'puppet' as a parameter, but that will only work among the same puppetserver. When the master is set to
+'none', but the class '::icinga2::pki::ca' is included, then the icinga master acts as a CA and generates and 
+validates a certificate and key to itself.
 
 .. code-block:: puppet
 
    class { '::icinga2::feature::api':
-      pki             => 'puppet',
+      pki             => 'none',
       accept_config   => true,
       accept_commands => true,
       ensure          => 'present',
@@ -223,6 +226,7 @@ master as a CA and use the already generated certificates by the puppet server.
          },
       },
    }
+   include ::icinga2::pki::ca
 
 Notification feature
 --------------------
@@ -282,17 +286,18 @@ API feature
 -----------
 
 The icinga agents must be aware of who the icinga master is, so it's important to declare it at the endpoint and zones. 
-The pki, as well as in the master, is set to puppet, but also we have to set the agent to acept configurations and 
-commands from the master; that is were the aceept_config and accept_commands come in place. 
+The pki will not be set, which translate in the default (icinga2), then the agent is going to ask for a certificate to
+the icinga master; also is needed to set the agent to acept configurations and commands from the master. 
 
 
 .. code-block:: puppet
 
    class { '::icinga2::feature::api':
-      pki             => 'puppet',
+      ensure          => 'present',
+      ca_host         => $icinga_master_ip,
+      ticket_salt     => $ca_salt,
       accept_config   => true,
       accept_commands => true,
-      ensure          => 'present',
       endpoints       => {
          $icinga_agent_fqdn  => {
          'host'  =>  $icinga_agent_ip
